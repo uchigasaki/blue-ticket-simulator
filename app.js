@@ -113,6 +113,13 @@ function renderSurveyFields(items, answers, prefix=""){
         </div>
       </div>`;
     }
+    if(q.type === "number"){
+      const min = q.min ?? "";
+      const max = q.max ?? "";
+      return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
+        <input class="input" type="number" name="${name}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" placeholder="${escapeHtml(q.placeholder || "")}" value="${escapeHtml(value)}" />
+      </div>`;
+    }
     if(q.type === "multi"){
       const arr = Array.isArray(value) ? value : [];
       return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
@@ -135,6 +142,15 @@ function collectSurvey(formElement, items, answers, prefix=""){
       const other = document.querySelector(`[data-other="${name}"]`)?.value.trim() || "";
       answers[q.id+"_other"] = other;
       if(vals.length === 0 && !q.optional){ state.error = t("required"); return false; }
+    }else if(q.type === "number"){
+      const val = form.get(name) || "";
+      answers[q.id] = val;
+      if(!val && !q.optional){ state.error = t("required"); return false; }
+      const n = Number(val);
+      if(val && (!Number.isFinite(n) || (q.min !== undefined && n < q.min) || (q.max !== undefined && n > q.max))){
+        state.error = state.lang === "ja" ? `${q.min}〜${q.max}の範囲で入力してください。` : `Please enter a value between ${q.min} and ${q.max}.`;
+        return false;
+      }
     }else{
       const val = form.get(name) || "";
       answers[q.id] = val;
@@ -388,8 +404,30 @@ function submitPostSurvey(e){
   state.postSurveyCompletedAt = new Date().toISOString();
   sendCompletionLog().finally(() => setScreen("final"));
 }
+function followupFormsForParticipant(){
+  const forms = DATA.config?.followupForms || {};
+  const mode = DATA.config?.followupDeliveryMode || "language";
+  if(mode === "both") return Object.entries(forms).filter(([,url]) => url).map(([lang,url]) => ({lang, url}));
+  const url = forms[state.lang] || forms.ja || forms.en || "";
+  return url ? [{lang: state.lang, url}] : [];
+}
+
+function followupEmailPreview(){
+  if(!state.email) return null;
+  const forms = followupFormsForParticipant();
+  const formLines = forms.map(f => `${f.lang.toUpperCase()}: ${f.url}`);
+  const subject = state.lang === "ja" ? "自転車青切符シミュレーター 1週間後アンケートのお願い" : "Follow-up survey for the Bicycle Blue Ticket Simulator";
+  const choiceInstruction = forms.length > 1
+    ? (state.lang === "ja" ? "下記のうち回答しやすい言語のフォームを1つ選んで回答してください。" : "Please choose one form in the language you prefer and answer it.")
+    : (state.lang === "ja" ? "下記のフォームに回答してください。" : "Please answer the form below.");
+  const body = state.lang === "ja"
+    ? `ご協力ありがとうございます。1週間後アンケートにご回答ください。\n${choiceInstruction}\n\n参加者ID: ${state.participantId}\n${formLines.join("\n")}\n\n回答時にも参加者IDを入力してください。`
+    : `Thank you for your participation. Please answer the one-week follow-up survey.\n${choiceInstruction}\n\nParticipant ID: ${state.participantId}\n${formLines.join("\n")}\n\nPlease enter this participant ID when answering the form.`;
+  return {subject, body, forms};
+}
+
 function renderFinal(){
-  const followupUrl = DATA.config?.followupFormUrl || "";
+  const emailPreview = followupEmailPreview();
   const follow = state.email
     ? (state.lang === "ja" ? `入力されたメールアドレスへ、1週間後に参加者ID（${state.participantId}）を添えてGoogleフォームの追跡アンケートURLを送付します。` : `A Google Form follow-up survey URL will be sent to the entered email one week later with your participant ID (${state.participantId}).`)
     : (state.lang === "ja" ? "メールアドレスは未入力のため，1週間後アンケートの送付対象にはなりません。" : "No email address was entered, so no follow-up survey will be sent.");
@@ -398,8 +436,8 @@ function renderFinal(){
       <div class="theme">${state.lang === "ja" ? "終了" : "Finished"}</div>
       <h2 class="title">${state.lang === "ja" ? "ご協力ありがとうございました" : "Thank you for your cooperation"}</h2>
       <p>${escapeHtml(follow)}</p>
-      ${followupUrl ? `<p class="notice">${state.lang === "ja" ? "追跡アンケート（Google Form）:" : "Follow-up survey (Google Form):"} <a href="${escapeHtml(followupUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(followupUrl)}</a></p>` : ""}
-      <p class="notice">${state.lang === "ja" ? "現時点のプロトタイプでは，結果画面または下のボタンからCSVログをダウンロードできます。" : "In this prototype, you can download the CSV log using the button below."}</p>
+      ${emailPreview ? `<p class="notice">${escapeHtml(emailPreview.forms.map(f => `${f.lang.toUpperCase()}: ${f.url}`).join(" / "))}</p>` : ""}
+      <p class="notice">${state.lang === "ja" ? "ログ送信先が設定されていない場合でも、下のボタンからCSVログをダウンロードできます。" : "Even if no log endpoint is configured, you can download the CSV log using the button below."}</p>
       <div class="row"><button class="btn" onclick="downloadCsv()">${escapeHtml(t('download'))}</button><button class="btn secondary" onclick="location.reload()">${escapeHtml(t('restart'))}</button></div>
     </section>
   `);
@@ -429,6 +467,12 @@ async function sendCompletionLog(){
     session_started_at: state.sessionStartedAt,
     simulation_completed_at: state.completedAt,
     post_survey_completed_at: state.postSurveyCompletedAt,
+    followup: {
+      requested: Boolean(state.email),
+      send_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      delivery_mode: DATA.config?.followupDeliveryMode || "language",
+      email_preview: followupEmailPreview()
+    },
     summary: buildSummary(),
     pre_survey: state.preSurveyAnswers,
     post_survey: state.postSurveyAnswers,
@@ -449,6 +493,8 @@ function downloadCsv(){
   rows.push(["session","session_id",state.sessionId]);
   rows.push(["session","participant_id",state.participantId]);
   rows.push(["session","email",state.email]);
+  rows.push(["session","followup_requested",Boolean(state.email)]);
+  rows.push(["session","followup_forms",followupFormsForParticipant().map(f=>`${f.lang}:${f.url}`).join("|")]);
   rows.push(["session","language",state.lang]);
   rows.push(["session","started_at",state.sessionStartedAt]);
   rows.push(["session","simulation_completed_at",state.completedAt]);

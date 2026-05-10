@@ -1,7 +1,11 @@
 window.APP_DATA = {
   "config": {
     "logEndpoint": "",
-    "followupFormUrl": "https://forms.gle/REPLACE_WITH_YOUR_FORM"
+    "followupForms": {
+      "ja": "https://docs.google.com/forms/d/1w0KiLON2Iwh16YWDO0rxAsehIfFQLbGce85FYl2pvHs/viewform?hl=ja",
+      "en": "https://docs.google.com/forms/d/e/1FAIpQLSdPUqYnljAeVxKN7eil14GnpuS6pmv5UNCWB1zEhq4ho2Jakw/viewform"
+    },
+    "followupDeliveryMode": "language"
   },
   "introCards": [
     {
@@ -840,6 +844,14 @@ window.APP_DATA = {
   "survey": {
     "ja": [
       {
+        "id": "age",
+        "type": "number",
+        "title": "年齢を入力してください。",
+        "min": 6,
+        "max": 100,
+        "placeholder": "例：18"
+      },
+      {
         "id": "bike_frequency",
         "type": "single",
         "title": "普段，自転車を利用する頻度を選んでください。",
@@ -897,6 +909,14 @@ window.APP_DATA = {
       }
     ],
     "en": [
+      {
+        "id": "age",
+        "type": "number",
+        "title": "Please enter your age.",
+        "min": 6,
+        "max": 100,
+        "placeholder": "Example: 18"
+      },
       {
         "id": "bike_frequency",
         "type": "single",

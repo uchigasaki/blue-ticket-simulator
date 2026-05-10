@@ -10,6 +10,7 @@
 
 ## 研究用アンケート設計
 ### 事前アンケート（Pre）
+- 年齢（背景属性）
 - 自転車利用頻度（背景属性）
 - 青切符制度の既知度（事前知識）
 - ルール理解自己評価（4件法）
@@ -34,8 +35,14 @@
 
 ## メールアドレスと1週間後フォローアップ
 - メールアドレス入力は任意です。
-- 入力があった場合は、**1週間後に参加者IDを添えてGoogleフォームの追跡アンケートURLを送付**する想定です。
-- GoogleフォームURLは `data.js` の `config.followupFormUrl` に設定します。
+- 入力があった場合は、Google Apps Script 側で参加者ID・メールアドレス・選択言語・送信予定日をGoogleスプレッドシートに保存できます。
+- 1週間後に、参加者IDを本文へ明記したメールでGoogleフォームの追跡アンケートURLを送る想定です。
+- 現在の追跡アンケートURLは `data.js` の `config.followupForms` に設定しています。
+  - 日本語: `https://docs.google.com/forms/d/1w0KiLON2Iwh16YWDO0rxAsehIfFQLbGce85FYl2pvHs/viewform?hl=ja`
+  - 英語: `https://docs.google.com/forms/d/e/1FAIpQLSdPUqYnljAeVxKN7eil14GnpuS6pmv5UNCWB1zEhq4ho2Jakw/viewform`
+- `config.followupDeliveryMode` は初期値 `language` です。
+  - `language`: 日本語UIの参加者には日本語フォーム、英語UIの参加者には英語フォームを送ります。
+  - `both`: 両方のフォームURLを送り、どちらか一方に回答してもらう運用にできます。
 
 ---
 
@@ -57,7 +64,19 @@
 
 ### 1) スプレッドシート準備
 1. 新規Googleスプレッドシートを作成
-2. シート名を例として `logs` にする
+2. `logs` と `followup_queue` の2つのシートを作成
+3. `followup_queue` には、少なくとも以下の列を用意
+   - `created_at`
+   - `send_at`
+   - `sent_at`
+   - `session_id`
+   - `participant_id`
+   - `email`
+   - `language`
+   - `delivery_mode`
+   - `forms_json`
+   - `subject`
+   - `body`
 
 ### 2) Apps Script 作成
 1. スプレッドシートから **拡張機能 > Apps Script**
@@ -65,9 +84,12 @@
 
 ```javascript
 function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('logs');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const logs = ss.getSheetByName('logs');
+  const queue = ss.getSheetByName('followup_queue');
   const body = JSON.parse(e.postData.contents);
-  sheet.appendRow([
+
+  logs.appendRow([
     new Date(),
     body.session_id,
     body.participant_id,
@@ -79,9 +101,45 @@ function doPost(e) {
     JSON.stringify(body.answers)
   ]);
 
+  if (body.email && body.followup && body.followup.email_preview) {
+    queue.appendRow([
+      new Date(),
+      body.followup.send_at,
+      '',
+      body.session_id,
+      body.participant_id,
+      body.email,
+      body.language,
+      body.followup.delivery_mode,
+      JSON.stringify(body.followup.email_preview.forms),
+      body.followup.email_preview.subject,
+      body.followup.email_preview.body
+    ]);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function sendDueFollowups() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('followup_queue');
+  const values = sheet.getDataRange().getValues();
+  const now = new Date();
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const sendAt = new Date(row[1]);
+    const sentAt = row[2];
+    const email = row[5];
+    const subject = row[9];
+    const body = row[10];
+
+    if (!sentAt && email && sendAt <= now) {
+      MailApp.sendEmail(email, subject, body);
+      sheet.getRange(i + 1, 3).setValue(new Date());
+    }
+  }
 }
 ```
 
@@ -95,6 +153,11 @@ function doPost(e) {
 ### 4) フロント側設定
 - `data.js` の `config.logEndpoint` にWebアプリURLを設定
 - `config.logEndpoint` が空文字のときは、ログ送信を行わずCSVダウンロードのみ動作
+
+### 5) 1週間後メール送信用トリガー
+1. Apps Script の **トリガー** を開く
+2. `sendDueFollowups` を時間主導型トリガーで1日1回などに設定
+3. `followup_queue` の `send_at` を過ぎた未送信行だけが送信され、送信後に `sent_at` が記録されます。
 
 ---
 
