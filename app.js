@@ -1,4 +1,5 @@
 const DATA = window.APP_DATA;
+const LOG_ENDPOINT = (window.LOG_ENDPOINT || DATA.config?.logEndpoint || "").trim();
 
 let state = {
   lang: "ja",
@@ -104,10 +105,11 @@ function renderSurveyFields(items, answers, prefix=""){
       </div>`;
     }
     if(q.type === "scale"){
+      const points = q.points || [1,2,3,4];
       return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
         <div class="scale">
           <div class="row" style="justify-content:space-between"><span class="muted">${escapeHtml(q.min)}</span><span class="muted">${escapeHtml(q.max)}</span></div>
-          <div class="scale-options">${[1,2,3,4,5].map(n=>`<label><input type="radio" name="${name}" value="${n}" ${String(value)===String(n)?'checked':''}><span>${n}</span></label>`).join("")}</div>
+          <div class="scale-options">${points.map(n=>`<label><input type="radio" name="${name}" value="${n}" ${String(value)===String(n)?'checked':''}><span>${n}</span></label>`).join("")}</div>
         </div>
       </div>`;
     }
@@ -334,19 +336,34 @@ function diagnosis(){
 }
 function renderResult(){
   const [type, comment] = diagnosis();
-  const pct = Math.round(state.score / DATA.questions.length * 100);
+  const totalQuestions = DATA.questions.length;
+  const pct = Math.round(state.score / totalQuestions * 100);
+  const situationQuestions = DATA.questions.filter(q => q.score_domain === "situation").map(q => q.id);
+  const systemQuestions = DATA.questions.filter(q => q.score_domain === "system").map(q => q.id);
+  const situationCorrect = state.answers.filter(a => a.is_correct && situationQuestions.includes(a.question_id)).length;
+  const systemCorrect = state.answers.filter(a => a.is_correct && systemQuestions.includes(a.question_id)).length;
+  const situationScore = situationQuestions.length ? Math.round((situationCorrect / situationQuestions.length) * 100) : 0;
+  const systemScore = systemQuestions.length ? Math.round((systemCorrect / systemQuestions.length) * 100) : 0;
+  const avgTimeMs = state.answers.length ? Math.round(state.answers.reduce((acc, cur) => acc + Number(cur.response_time_ms || 0), 0) / state.answers.length) : 0;
+  const avgTimeSec = (avgTimeMs / 1000).toFixed(1);
   const btnText = state.lang === "ja" ? "事後アンケートへ進む" : "Continue to post-survey";
   app.innerHTML = layout(`
     <section class="card stack">
       <div class="theme">${escapeHtml(t('resultTitle'))}</div>
-      <h2 class="title">${escapeHtml(t('score'))}: ${state.score} / ${DATA.questions.length}</h2>
+      <h2 class="title">${escapeHtml(t('score'))}: ${state.score} / ${totalQuestions}</h2>
       <div class="progress"><div style="width:${pct}%"></div></div>
+      <div class="result-grid">
+        <div class="notice"><strong>${state.lang === "ja" ? "総合正答率" : "Overall accuracy"}</strong><br>${pct}%</div>
+        <div class="notice"><strong>${state.lang === "ja" ? "場面判断スコア" : "Situation judgment score"}</strong><br>${situationScore}%</div>
+        <div class="notice"><strong>${state.lang === "ja" ? "制度理解スコア" : "System understanding score"}</strong><br>${systemScore}%</div>
+        <div class="notice"><strong>${state.lang === "ja" ? "平均回答時間" : "Average response time"}</strong><br>${avgTimeSec}s</div>
+      </div>
       <p class="result-type">${escapeHtml(type)}</p>
       <p>${escapeHtml(comment)}</p>
       <p class="notice">${state.lang === "ja" ? "最後に，学習後の意識変化を確認するための簡単な事後アンケートに回答してください。" : "Finally, please answer a short post-survey to check changes after learning."}</p>
       <div class="row"><button class="btn" onclick="setScreen('post')">${escapeHtml(btnText)}</button><button class="btn secondary" onclick="downloadCsv()">${escapeHtml(t('download'))}</button></div>
     </section>
-  `, `${state.score} / ${DATA.questions.length}`);
+  `, `${state.score} / ${totalQuestions}`);
 }
 
 function renderPostSurvey(){
@@ -369,21 +386,61 @@ function submitPostSurvey(e){
   e.preventDefault();
   if(!collectSurvey(e.target, DATA.postSurvey[state.lang], state.postSurveyAnswers, "post_")) return renderPostSurvey();
   state.postSurveyCompletedAt = new Date().toISOString();
-  setScreen("final");
+  sendCompletionLog().finally(() => setScreen("final"));
 }
 function renderFinal(){
+  const followupUrl = DATA.config?.followupFormUrl || "";
   const follow = state.email
-    ? (state.lang === "ja" ? "入力されたメールアドレスには，必要に応じて1週間後アンケートのURLを送付します。" : "If needed, a follow-up survey URL will be sent to the email address you entered.")
+    ? (state.lang === "ja" ? `入力されたメールアドレスへ、1週間後に参加者ID（${state.participantId}）を添えてGoogleフォームの追跡アンケートURLを送付します。` : `A Google Form follow-up survey URL will be sent to the entered email one week later with your participant ID (${state.participantId}).`)
     : (state.lang === "ja" ? "メールアドレスは未入力のため，1週間後アンケートの送付対象にはなりません。" : "No email address was entered, so no follow-up survey will be sent.");
   app.innerHTML = layout(`
     <section class="card stack center">
       <div class="theme">${state.lang === "ja" ? "終了" : "Finished"}</div>
       <h2 class="title">${state.lang === "ja" ? "ご協力ありがとうございました" : "Thank you for your cooperation"}</h2>
       <p>${escapeHtml(follow)}</p>
+      ${followupUrl ? `<p class="notice">${state.lang === "ja" ? "追跡アンケート（Google Form）:" : "Follow-up survey (Google Form):"} <a href="${escapeHtml(followupUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(followupUrl)}</a></p>` : ""}
       <p class="notice">${state.lang === "ja" ? "現時点のプロトタイプでは，結果画面または下のボタンからCSVログをダウンロードできます。" : "In this prototype, you can download the CSV log using the button below."}</p>
       <div class="row"><button class="btn" onclick="downloadCsv()">${escapeHtml(t('download'))}</button><button class="btn secondary" onclick="location.reload()">${escapeHtml(t('restart'))}</button></div>
     </section>
   `);
+}
+
+function buildSummary(){
+  const totalQuestions = DATA.questions.length;
+  const overall = Math.round((state.score / totalQuestions) * 100);
+  const situationIds = DATA.questions.filter(q => q.score_domain === "situation").map(q => q.id);
+  const systemIds = DATA.questions.filter(q => q.score_domain === "system").map(q => q.id);
+  const situationCorrect = state.answers.filter(a => a.is_correct && situationIds.includes(a.question_id)).length;
+  const systemCorrect = state.answers.filter(a => a.is_correct && systemIds.includes(a.question_id)).length;
+  return {
+    overall_accuracy: overall,
+    situation_score: situationIds.length ? Math.round((situationCorrect / situationIds.length) * 100) : 0,
+    system_score: systemIds.length ? Math.round((systemCorrect / systemIds.length) * 100) : 0
+  };
+}
+
+async function sendCompletionLog(){
+  if(!LOG_ENDPOINT) return;
+  const payload = {
+    session_id: state.sessionId,
+    participant_id: state.participantId,
+    email: state.email,
+    language: state.lang,
+    session_started_at: state.sessionStartedAt,
+    simulation_completed_at: state.completedAt,
+    post_survey_completed_at: state.postSurveyCompletedAt,
+    summary: buildSummary(),
+    pre_survey: state.preSurveyAnswers,
+    post_survey: state.postSurveyAnswers,
+    answers: state.answers
+  };
+  try{
+    await fetch(LOG_ENDPOINT, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
+    });
+  }catch(_e){}
 }
 
 function downloadCsv(){

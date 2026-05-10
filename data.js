@@ -1,4 +1,8 @@
 window.APP_DATA = {
+  "config": {
+    "logEndpoint": "",
+    "followupFormUrl": "https://forms.gle/REPLACE_WITH_YOUR_FORM"
+  },
   "introCards": [
     {
       "id": "intro_1",
@@ -42,6 +46,7 @@ window.APP_DATA = {
   "questions": [
     {
       "id": "q1",
+      "score_domain": "situation",
       "type": "multi",
       "theme": {
         "ja": "問題 1 / 安全寄りかつ法的に許される可能性",
@@ -104,6 +109,7 @@ window.APP_DATA = {
     },
     {
       "id": "q2",
+      "score_domain": "situation",
       "type": "multi",
       "theme": {
         "ja": "問題 2 / 青切符になりうる行動",
@@ -170,6 +176,7 @@ window.APP_DATA = {
     },
     {
       "id": "q3",
+      "score_domain": "situation",
       "type": "single",
       "theme": {
         "ja": "問題 3 / どう扱われる可能性が高いか",
@@ -229,6 +236,7 @@ window.APP_DATA = {
     },
     {
       "id": "q4",
+      "score_domain": "situation",
       "type": "single",
       "theme": {
         "ja": "問題 4 / どう扱われる可能性が高いか",
@@ -288,6 +296,7 @@ window.APP_DATA = {
     },
     {
       "id": "q5",
+      "score_domain": "situation",
       "type": "multi",
       "theme": {
         "ja": "問題 5 / 青切符になりうる行動",
@@ -350,6 +359,7 @@ window.APP_DATA = {
     },
     {
       "id": "q6",
+      "score_domain": "situation",
       "type": "multi",
       "theme": {
         "ja": "問題 6 / 青切符になりうる行動",
@@ -412,6 +422,7 @@ window.APP_DATA = {
     },
     {
       "id": "q7",
+      "score_domain": "system",
       "type": "multi",
       "theme": {
         "ja": "問題 7 / 青切符になりうる行動",
@@ -474,6 +485,7 @@ window.APP_DATA = {
     },
     {
       "id": "q8",
+      "score_domain": "system",
       "type": "multi",
       "theme": {
         "ja": "問題 8 / 違反になりうるもの",
@@ -544,6 +556,7 @@ window.APP_DATA = {
     },
     {
       "id": "q9",
+      "score_domain": "system",
       "type": "classify",
       "theme": {
         "ja": "問題 9 / 青切符と違反なしの分類",
@@ -621,6 +634,7 @@ window.APP_DATA = {
     },
     {
       "id": "q10",
+      "score_domain": "system",
       "type": "single",
       "theme": {
         "ja": "問題 10 / 誤っているものを1つ選ぶ",
@@ -680,6 +694,7 @@ window.APP_DATA = {
     },
     {
       "id": "q11",
+      "score_domain": "system",
       "type": "multi",
       "theme": {
         "ja": "問題 11 / 正しいものをすべて選ぶ",
@@ -751,6 +766,7 @@ window.APP_DATA = {
     },
     {
       "id": "q12",
+      "score_domain": "system",
       "type": "multi",
       "theme": {
         "ja": "問題 12 / 正しいものをすべて選ぶ",
@@ -847,16 +863,18 @@ window.APP_DATA = {
       {
         "id": "rule_understanding",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "自転車の交通ルールについて，自分は理解できていると思いますか。",
-        "min": "まったくそう思わない",
-        "max": "とてもそう思う"
+        "min": "あてはまらない",
+        "max": "あてはまる"
       },
       {
         "id": "knowledge_judgment_gap",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "自転車の交通ルールについて，「知識として知っていること」と「実際の場面で正しく判断できること」には差があると思いますか。",
-        "min": "まったくそう思わない",
-        "max": "とてもそう思う"
+        "min": "あてはまらない",
+        "max": "あてはまる"
       },
       {
         "id": "learning_needs",
@@ -903,16 +921,18 @@ window.APP_DATA = {
       {
         "id": "rule_understanding",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "Do you think you understand bicycle traffic rules?",
-        "min": "Strongly disagree",
-        "max": "Strongly agree"
+        "min": "Does not apply",
+        "max": "Applies"
       },
       {
         "id": "knowledge_judgment_gap",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "Do you think there is a gap between knowing bicycle traffic rules and correctly judging what to do in real situations?",
-        "min": "Strongly disagree",
-        "max": "Strongly agree"
+        "min": "Does not apply",
+        "max": "Applies"
       },
       {
         "id": "learning_needs",
@@ -947,7 +967,7 @@ window.APP_DATA = {
       "participantId": "参加者ID",
       "participantPlaceholder": "例：P001",
       "consent": "このサイトでは，回答内容，正誤，回答時間を研究目的で記録します。氏名など個人を直接特定する情報は入力しないでください。",
-      "surveyTitle": "事前アンケート",
+      "surveyTitle": "事前アンケート（研究用）",
       "simulationTitle": "シミュレーション",
       "required": "この項目に回答してください。",
       "correct": "正解",
@@ -972,7 +992,7 @@ window.APP_DATA = {
       "participantId": "Participant ID",
       "participantPlaceholder": "Example: P001",
       "consent": "This site records your answers, correctness, and response time for research purposes. Please do not enter information that directly identifies you, such as your real name.",
-      "surveyTitle": "Pre-survey",
+      "surveyTitle": "Pre-survey (Research)",
       "simulationTitle": "Simulation",
       "required": "Please answer this item.",
       "correct": "Correct",
@@ -992,30 +1012,34 @@ window.APP_DATA = {
       {
         "id": "post_understanding",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "シミュレーション後，自転車の交通ルールへの理解は深まったと思いますか。",
-        "min": "まったくそう思わない",
-        "max": "とてもそう思う"
+        "min": "あてはまらない",
+        "max": "あてはまる"
       },
       {
         "id": "post_judgment_confidence",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "シミュレーション後，実際の場面でどの行動が違反になりうるか判断しやすくなったと思いますか。",
-        "min": "まったくそう思わない",
-        "max": "とてもそう思う"
+        "min": "あてはまらない",
+        "max": "あてはまる"
       },
       {
         "id": "post_scenario_helpful",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "画像や具体的な場面を用いた問題は，交通ルールの理解に役立ったと思いますか。",
-        "min": "まったくそう思わない",
-        "max": "とてもそう思う"
+        "min": "あてはまらない",
+        "max": "あてはまる"
       },
       {
         "id": "post_behavior_intention",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "今後，自転車に乗るときの行動を見直そうと思いましたか。",
-        "min": "まったくそう思わない",
-        "max": "とてもそう思う"
+        "min": "あてはまらない",
+        "max": "あてはまる"
       },
       {
         "id": "post_useful_content",
@@ -1041,30 +1065,34 @@ window.APP_DATA = {
       {
         "id": "post_understanding",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "After the simulation, do you think your understanding of bicycle traffic rules improved?",
-        "min": "Strongly disagree",
-        "max": "Strongly agree"
+        "min": "Does not apply",
+        "max": "Applies"
       },
       {
         "id": "post_judgment_confidence",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "After the simulation, do you think it became easier to judge which actions could be violations in real situations?",
-        "min": "Strongly disagree",
-        "max": "Strongly agree"
+        "min": "Does not apply",
+        "max": "Applies"
       },
       {
         "id": "post_scenario_helpful",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "Do you think the image-based and situation-based questions helped you understand the rules?",
-        "min": "Strongly disagree",
-        "max": "Strongly agree"
+        "min": "Does not apply",
+        "max": "Applies"
       },
       {
         "id": "post_behavior_intention",
         "type": "scale",
+        "points": [1, 2, 3, 4],
         "title": "Did the simulation make you want to review your own behavior when riding a bicycle?",
-        "min": "Strongly disagree",
-        "max": "Strongly agree"
+        "min": "Does not apply",
+        "max": "Applies"
       },
       {
         "id": "post_useful_content",
