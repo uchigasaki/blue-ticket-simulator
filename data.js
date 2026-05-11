@@ -1,6 +1,6 @@
 window.APP_DATA = {
   "config": {
-    "logEndpoint": "",
+    "logEndpoint": "https://script.google.com/macros/s/AKfycbxeGuRXGSECZHyzEUsBZq6_-JYrO_-NXPkcMC_j84zgzOrbh3VN2wt1pRRoGfnHOxQJ/exec",
     "followupForms": {
       "ja": "https://docs.google.com/forms/d/1w0KiLON2Iwh16YWDO0rxAsehIfFQLbGce85FYl2pvHs/viewform?hl=ja",
       "en": "https://docs.google.com/forms/d/e/1FAIpQLSdPUqYnljAeVxKN7eil14GnpuS6pmv5UNCWB1zEhq4ho2Jakw/viewform"
