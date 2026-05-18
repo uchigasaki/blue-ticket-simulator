@@ -88,7 +88,8 @@ button,input,textarea{font:inherit}
   .choice{padding:13px 12px;gap:11px;border-radius:16px}
   .choice-marker{flex-basis:30px;width:30px;height:30px;font-size:13px}
   .choice-text{font-size:15px;line-height:1.6}
-  .scale{padding:13px}.scale-labels{font-size:12px}.scale-options{grid-template-columns:1fr;gap:8px}.scale-option{min-height:54px;border-radius:14px;display:flex;justify-content:flex-start;padding:10px 12px}.scale-text{text-align:left;font-size:13px}
+  .scale{padding:13px}.scale-labels{display:none}.scale-options{grid-template-columns:1fr;gap:8px}.scale-option{min-height:58px;border-radius:14px;display:flex;align-items:center;justify-content:flex-start;padding:10px 12px;text-align:left}.scale-number{flex:0 0 36px}.scale-text{display:block;text-align:left;font-size:14px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+  .sending-notice{font-size:14px;line-height:1.65}
   .classify-options{grid-template-columns:1fr;margin-left:0}.classify-prompt{margin-bottom:10px}
   .result-grid{grid-template-columns:1fr}
   .question-img{max-height:240px}

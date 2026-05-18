@@ -460,9 +460,9 @@ function renderPostSurvey(){
   const survey = DATA.postSurvey[state.lang];
   const fields = renderSurveyFields(survey, state.postSurveyAnswers, "post_");
   const summary = surveyErrorSummary();
-  const submittingNotice = state.isSubmittingPost
-    ? `<p class="notice sending-notice">${state.lang === "ja" ? "送信中です。画面が切り替わるまで、送信ボタンは1度だけ押してお待ちください。" : "Submitting. Please press the submit button only once and wait until the screen changes."}</p>`
-    : "";
+  const submittingNotice = `<p class="notice sending-notice">${state.isSubmittingPost
+    ? (state.lang === "ja" ? "送信中です。画面が切り替わるまで、送信ボタンは1度だけ押してお待ちください。" : "Submitting. Please press the submit button only once and wait until the screen changes.")
+    : (state.lang === "ja" ? "送信ボタンを押すと画面が切り替わります。二重送信を防ぐため、送信ボタンは1度だけ押してください。" : "After pressing submit, the screen will change. To prevent duplicate submissions, please press the submit button only once.")}</p>`;
   app.innerHTML = layout(`
     ${summary}
     <section class="card">
