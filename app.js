@@ -19,13 +19,25 @@ let state = {
   sessionStartedAt: new Date().toISOString(),
   completedAt: null,
   postSurveyCompletedAt: null,
-  error: ""
+  error: "",
+  validationErrors: {},
+  isSubmittingPost: false
 };
 
 const app = document.getElementById("app");
 const t = (key) => DATA.ui[state.lang][key] || key;
 const textOf = (obj) => typeof obj === "string" ? obj : obj?.[state.lang] || obj?.ja || "";
 const $ = (s) => document.querySelector(s);
+
+function syncSelectionState(root=app){
+  root.querySelectorAll(".choice, .scale-option, .classify-option").forEach(label => {
+    const input = label.querySelector("input");
+    label.classList.toggle("is-selected", Boolean(input?.checked));
+  });
+}
+app.addEventListener("change", (event) => {
+  if(event.target.matches('input[type="radio"], input[type="checkbox"]')) syncSelectionState();
+});
 
 function escapeHtml(str){
   return String(str ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -47,6 +59,7 @@ function selectedValue(sel){
 function setScreen(screen){
   state.screen = screen;
   state.error = "";
+  state.validationErrors = {};
   render();
   window.scrollTo({top:0, behavior:"smooth"});
 }
@@ -66,14 +79,15 @@ function layout(content, progressText=""){
   </main>`;
 }
 function render(){
-  if(state.screen === "language") return renderLanguage();
-  if(state.screen === "pre") return renderPreSurvey();
-  if(state.screen === "intro") return renderIntro();
-  if(state.screen === "question") return renderQuestion();
-  if(state.screen === "feedback") return renderFeedback();
-  if(state.screen === "result") return renderResult();
-  if(state.screen === "post") return renderPostSurvey();
-  if(state.screen === "final") return renderFinal();
+  if(state.screen === "language") renderLanguage();
+  if(state.screen === "pre") renderPreSurvey();
+  if(state.screen === "intro") renderIntro();
+  if(state.screen === "question") renderQuestion();
+  if(state.screen === "feedback") renderFeedback();
+  if(state.screen === "result") renderResult();
+  if(state.screen === "post") renderPostSurvey();
+  if(state.screen === "final") renderFinal();
+  syncSelectionState();
 }
 
 function renderLanguage(){
@@ -95,69 +109,118 @@ function chooseLang(lang){
   setScreen("pre");
 }
 
+
+function scaleOptionLabel(point, q){
+  const labels = {
+    ja: {
+      1: q.min || "あてはまらない",
+      2: "あまりあてはまらない",
+      3: "ややあてはまる",
+      4: q.max || "あてはまる"
+    },
+    en: {
+      1: q.min || "Does not apply",
+      2: "Mostly does not apply",
+      3: "Somewhat applies",
+      4: q.max || "Applies"
+    }
+  };
+  return labels[state.lang]?.[point] || String(point);
+}
+
+function validationMessage(key){
+  return state.validationErrors[key] || "";
+}
+function invalidClass(key){
+  return validationMessage(key) ? " invalid" : "";
+}
+function fieldErrorHtml(key){
+  const message = validationMessage(key);
+  return message ? `<p class="field-error">${escapeHtml(message)}</p>` : "";
+}
+function surveyErrorSummary(){
+  const messages = Object.values(state.validationErrors);
+  if(messages.length === 0) return "";
+  const uniqueMessages = [...new Set(messages)];
+  return `<div class="error-summary" role="alert"><strong>${escapeHtml(state.lang === "ja" ? "未入力または修正が必要な項目があります。" : "Some items are missing or need correction.")}</strong><ul>${uniqueMessages.map(message => `<li>${escapeHtml(message)}</li>`).join("")}</ul></div>`;
+}
+
 function renderSurveyFields(items, answers, prefix=""){
   return items.map((q,idx)=>{
     const value = answers[q.id] || "";
     const name = `${prefix}${q.id}`;
+    const error = fieldErrorHtml(name);
+    const cardClass = `card survey-card${invalidClass(name)}`;
     if(q.type === "single"){
-      return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
-        ${q.choices.map(c=>`<label class="choice"><input type="radio" name="${name}" value="${escapeHtml(c)}" ${value===c?'checked':''}><span>${escapeHtml(c)}</span></label>`).join("")}
+      return `<div class="${cardClass}"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
+        ${q.choices.map(c=>`<label class="choice"><input type="radio" name="${name}" value="${escapeHtml(c)}" ${value===c?'checked':''}><span class="choice-marker" aria-hidden="true"></span><span class="choice-text">${escapeHtml(c)}</span></label>`).join("")}
+        ${error}
       </div>`;
     }
     if(q.type === "scale"){
       const points = q.points || [1,2,3,4];
-      return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
-        <div class="scale">
-          <div class="row" style="justify-content:space-between"><span class="muted">${escapeHtml(q.min)}</span><span class="muted">${escapeHtml(q.max)}</span></div>
-          <div class="scale-options">${points.map(n=>`<label><input type="radio" name="${name}" value="${n}" ${String(value)===String(n)?'checked':''}><span>${n}</span></label>`).join("")}</div>
+      return `<div class="${cardClass}"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
+        <div class="scale${invalidClass(name)}">
+          <div class="scale-labels"><span class="muted">${escapeHtml(q.min)}</span><span class="muted">${escapeHtml(q.max)}</span></div>
+          <div class="scale-options">${points.map(n=>`<label class="scale-option"><input type="radio" name="${name}" value="${n}" ${String(value)===String(n)?'checked':''}><span class="scale-number">${n}</span><span class="scale-text">${escapeHtml(scaleOptionLabel(n, q))}</span></label>`).join("")}</div>
         </div>
+        ${error}
       </div>`;
     }
     if(q.type === "number"){
       const min = q.min ?? "";
       const max = q.max ?? "";
-      return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
-        <input class="input" type="number" name="${name}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" placeholder="${escapeHtml(q.placeholder || "")}" value="${escapeHtml(value)}" />
+      return `<div class="${cardClass}"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
+        <input class="input${invalidClass(name)}" type="number" name="${name}" min="${escapeHtml(min)}" max="${escapeHtml(max)}" placeholder="${escapeHtml(q.placeholder || "")}" value="${escapeHtml(value)}" />
+        ${error}
       </div>`;
     }
     if(q.type === "multi"){
       const arr = Array.isArray(value) ? value : [];
-      return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
-        ${q.choices.map(c=>`<label class="choice"><input type="checkbox" name="${name}" value="${escapeHtml(c)}" ${arr.includes(c)?'checked':''}><span>${escapeHtml(c)}</span></label>`).join("")}
+      return `<div class="${cardClass}"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
+        ${q.choices.map(c=>`<label class="choice"><input type="checkbox" name="${name}" value="${escapeHtml(c)}" ${arr.includes(c)?'checked':''}><span class="choice-marker" aria-hidden="true"></span><span class="choice-text">${escapeHtml(c)}</span></label>`).join("")}
         <input class="input" data-other="${name}" placeholder="${escapeHtml(t('otherText'))}" value="${escapeHtml(answers[q.id+'_other']||'')}" />
+        ${error}
       </div>`;
     }
-    return `<div class="card"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
-      <textarea class="textarea" name="${name}" placeholder="${q.optional ? (state.lang==='ja'?'任意':'Optional') : ''}">${escapeHtml(value)}</textarea>
+    return `<div class="${cardClass}"><div class="theme">Q${idx+1}</div><h2 class="title">${escapeHtml(q.title)}</h2>
+      <textarea class="textarea${invalidClass(name)}" name="${name}" placeholder="${q.optional ? (state.lang==='ja'?'任意':'Optional') : ''}">${escapeHtml(value)}</textarea>
+      ${error}
     </div>`;
   }).join("");
 }
 function collectSurvey(formElement, items, answers, prefix=""){
   const form = new FormData(formElement);
+  const nextAnswers = {...answers};
+  const errors = {};
   for(const q of items){
     const name = `${prefix}${q.id}`;
     if(q.type === "multi"){
       const vals = form.getAll(name);
-      answers[q.id] = vals;
-      const other = document.querySelector(`[data-other="${name}"]`)?.value.trim() || "";
-      answers[q.id+"_other"] = other;
-      if(vals.length === 0 && !q.optional){ state.error = t("required"); return false; }
+      nextAnswers[q.id] = vals;
+            const other = document.querySelector(`[data-other="${name}"]`)?.value.trim() || "";
+      nextAnswers[q.id+"_other"] = other;
+      if(vals.length === 0 && !q.optional) errors[name] = t("required");
     }else if(q.type === "number"){
       const val = form.get(name) || "";
-      answers[q.id] = val;
-      if(!val && !q.optional){ state.error = t("required"); return false; }
-      const n = Number(val);
-      if(val && (!Number.isFinite(n) || (q.min !== undefined && n < q.min) || (q.max !== undefined && n > q.max))){
-        state.error = state.lang === "ja" ? `${q.min}〜${q.max}の範囲で入力してください。` : `Please enter a value between ${q.min} and ${q.max}.`;
-        return false;
+      nextAnswers[q.id] = val;
+      if(!val && !q.optional){
+        errors[name] = t("required");
+      }else if(val){
+        const n = Number(val);
+        if(!Number.isFinite(n) || (q.min !== undefined && n < q.min) || (q.max !== undefined && n > q.max)){
+          errors[name] = state.lang === "ja" ? `${q.min}〜${q.max}の範囲で入力してください。` : `Please enter a value between ${q.min} and ${q.max}.`;
+        }
       }
     }else{
       const val = form.get(name) || "";
-      answers[q.id] = val;
-      if(!val && !q.optional){ state.error = t("required"); return false; }
+      nextAnswers[q.id] = val;
+      if(!val && !q.optional) errors[name] = t("required");
     }
   }
-  return true;
+  Object.assign(answers, nextAnswers);
+  state.validationErrors = {...state.validationErrors, ...errors};
+  return Object.keys(errors).length === 0;
 }
 function renderPreSurvey(){
   const survey = DATA.survey[state.lang];
@@ -171,17 +234,21 @@ function renderPreSurvey(){
   const consentText = state.lang === "ja"
     ? "回答内容，正誤，回答時間を研究目的で記録することに同意します。"
     : "I agree that my answers, correctness, and response time may be recorded for research purposes.";
+  const summary = surveyErrorSummary();
   app.innerHTML = layout(`
+    ${summary}
     <section class="card">
       <div class="theme">${escapeHtml(t('surveyTitle'))}</div>
       <h2 class="title">${escapeHtml(t('participantId'))}</h2>
-      <input id="participant" class="input" placeholder="BIKE33" value="${escapeHtml(state.participantId)}" />
+      <input id="participant" class="input${invalidClass('participant')}" placeholder="BIKE33" value="${escapeHtml(state.participantId)}" />
+      ${fieldErrorHtml('participant')}
       <p class="notice">${escapeHtml(idHelp)}</p>
       <h2 class="title" style="margin-top:18px">${state.lang === "ja" ? "メールアドレス（任意）" : "Email address (optional)"}</h2>
-      <input id="email" class="input" type="email" placeholder="example@example.com" value="${escapeHtml(state.email)}" />
+      <input id="email" class="input${invalidClass('email')}" type="email" placeholder="example@example.com" value="${escapeHtml(state.email)}" />
+      ${fieldErrorHtml('email')}
       <p class="notice">${escapeHtml(emailHelp)}</p>
-      <label class="choice"><input id="consent" type="checkbox" ${state.consent ? 'checked' : ''}><span>${escapeHtml(consentText)}</span></label>
-      ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ""}
+      <label class="choice consent-choice${invalidClass('consent')}"><input id="consent" type="checkbox" ${state.consent ? 'checked' : ''}><span class="choice-marker" aria-hidden="true"></span><span class="choice-text">${escapeHtml(consentText)}</span></label>
+      ${fieldErrorHtml('consent')}
     </section>
     <form id="preSurveyForm">${fields}
       <div class="row card"><button type="submit" class="btn">${escapeHtml(t('start'))}</button></div>
@@ -191,16 +258,23 @@ function renderPreSurvey(){
 }
 function submitPreSurvey(e){
   e.preventDefault();
+  state.validationErrors = {};
+  state.error = "";
   state.participantId = $("#participant").value.trim();
   state.email = $("#email").value.trim();
   state.consent = $("#consent").checked;
-  if(!state.participantId){ state.error = t("required"); return renderPreSurvey(); }
-  if(!/^[A-Za-z]{4}\d{2}$/.test(state.participantId)){
-    state.error = state.lang === "ja" ? "参加者IDは英字4文字＋数字2桁で入力してください。例：BIKE33" : "Participant ID must be four letters and two digits, such as BIKE33.";
-    return renderPreSurvey();
+  const errors = {};
+  if(!state.participantId) errors.participant = t("required");
+  else if(!/^[A-Za-z]{4}\d{2}$/.test(state.participantId)){
+    errors.participant = state.lang === "ja" ? "参加者IDは英字4文字＋数字2桁で入力してください。例：BIKE33" : "Participant ID must be four letters and two digits, such as BIKE33.";
   }
-  if(!state.consent){ state.error = state.lang === "ja" ? "同意欄にチェックしてください。" : "Please check the consent box."; return renderPreSurvey(); }
-  if(!collectSurvey(e.target, DATA.survey[state.lang], state.preSurveyAnswers, "pre_")) return renderPreSurvey();
+  if(state.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email)){
+    errors.email = state.lang === "ja" ? "メールアドレスの形式を確認してください。" : "Please check the email address format.";
+  }
+  if(!state.consent) errors.consent = state.lang === "ja" ? "同意欄にチェックしてください。" : "Please check the consent box.";
+  state.validationErrors = errors;
+  const surveyOk = collectSurvey(e.target, DATA.survey[state.lang], state.preSurveyAnswers, "pre_");
+  if(Object.keys(state.validationErrors).length > 0 || !surveyOk) return renderPreSurvey();
   state.introIndex = 0;
   setScreen("intro");
 }
@@ -227,14 +301,14 @@ function renderQuestion(){
   const progress = `${state.qIndex+1} / ${DATA.questions.length}`;
   let inputHtml = "";
   if(q.type === "single"){
-    inputHtml = Object.keys(q.choices).map(k=>`<label class="choice"><input type="radio" name="answer" value="${k}"><span><strong>${k}. </strong>${escapeHtml(textOf(q.choices[k]))}</span></label>`).join("");
+    inputHtml = Object.keys(q.choices).map(k=>`<label class="choice"><input type="radio" name="answer" value="${k}"><span class="choice-marker" aria-hidden="true">${k}</span><span class="choice-text">${escapeHtml(textOf(q.choices[k]))}</span></label>`).join("");
   } else if(q.type === "multi"){
-    inputHtml = Object.keys(q.choices).map(k=>`<label class="choice"><input type="checkbox" name="answer" value="${k}"><span><strong>${k}. </strong>${escapeHtml(textOf(q.choices[k]))}</span></label>`).join("");
+    inputHtml = Object.keys(q.choices).map(k=>`<label class="choice"><input type="checkbox" name="answer" value="${k}"><span class="choice-marker" aria-hidden="true">${k}</span><span class="choice-text">${escapeHtml(textOf(q.choices[k]))}</span></label>`).join("");
   } else if(q.type === "classify"){
     inputHtml = Object.keys(q.choices).map(k=>`
-      <div class="choice" style="display:block">
-        <p><strong>${k}. </strong>${escapeHtml(textOf(q.choices[k]))}</p>
-        <div class="row">${q.groups.map(g=>`<label><input type="radio" name="class_${k}" value="${escapeHtml(g)}"> ${escapeHtml(textOf(g))}</label>`).join("")}</div>
+      <div class="choice classify-choice">
+        <div class="classify-prompt"><span class="choice-marker" aria-hidden="true">${k}</span><span class="choice-text">${escapeHtml(textOf(q.choices[k]))}</span></div>
+        <div class="classify-options">${q.groups.map(g=>`<label class="classify-option"><input type="radio" name="class_${k}" value="${escapeHtml(g)}"><span>${escapeHtml(textOf(g))}</span></label>`).join("")}</div>
       </div>`).join("");
   }
   app.innerHTML = layout(`
@@ -314,7 +388,7 @@ function renderFeedback(){
       else {status= state.lang==='ja'?'選ばなくてよい':'Not needed';}
       return `<div class="detail-item"><span class="${cls}">${mark} ${escapeHtml(status)}</span><br><strong>${k}</strong> ${escapeHtml(textOf(q.choices[k]))}<br>${escapeHtml(textOf(q.feedback[k]))}</div>`;
     }).join("");
-  }
+      }
   const ok = row.is_correct;
   const nextLabel = state.qIndex >= DATA.questions.length-1 ? t("seeResult") : t("next");
   app.innerHTML = layout(`
@@ -385,24 +459,34 @@ function renderResult(){
 function renderPostSurvey(){
   const survey = DATA.postSurvey[state.lang];
   const fields = renderSurveyFields(survey, state.postSurveyAnswers, "post_");
+  const summary = surveyErrorSummary();
+  const submittingNotice = state.isSubmittingPost
+    ? `<p class="notice sending-notice">${state.lang === "ja" ? "送信中です。画面が切り替わるまで、送信ボタンは1度だけ押してお待ちください。" : "Submitting. Please press the submit button only once and wait until the screen changes."}</p>`
+    : "";
   app.innerHTML = layout(`
+    ${summary}
     <section class="card">
       <div class="theme">${state.lang === "ja" ? "事後アンケート" : "Post-survey"}</div>
       <h2 class="title">${state.lang === "ja" ? "学習後の変化について" : "About changes after learning"}</h2>
       <p class="notice">${state.lang === "ja" ? "仮の設問です。後から変更できます。" : "These are provisional questions and can be changed later."}</p>
-      ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ""}
+      ${submittingNotice}
     </section>
     <form id="postSurveyForm">${fields}
-      <div class="row card"><button type="submit" class="btn">${state.lang === "ja" ? "送信して終了" : "Submit and finish"}</button></div>
+      <div class="row card"><button type="submit" class="btn" ${state.isSubmittingPost ? "disabled" : ""}>${state.isSubmittingPost ? (state.lang === "ja" ? "送信中です…" : "Submitting...") : (state.lang === "ja" ? "送信して終了" : "Submit and finish")}</button></div>
     </form>
   `, `${state.score} / ${DATA.questions.length}`);
   $("#postSurveyForm").addEventListener("submit", submitPostSurvey);
 }
 function submitPostSurvey(e){
   e.preventDefault();
+  if(state.isSubmittingPost) return;
+  state.validationErrors = {};
+  state.error = "";
   if(!collectSurvey(e.target, DATA.postSurvey[state.lang], state.postSurveyAnswers, "post_")) return renderPostSurvey();
   state.postSurveyCompletedAt = new Date().toISOString();
-  sendCompletionLog().finally(() => setScreen("final"));
+  state.isSubmittingPost = true;
+  renderPostSurvey();
+  sendCompletionLog().finally(() => { state.isSubmittingPost = false; setScreen("final"); });
 }
 function followupFormsForParticipant(){
   const forms = DATA.config?.followupForms || {};
@@ -432,11 +516,11 @@ function renderFinal(){
     ? (state.lang === "ja" ? `入力されたメールアドレスへ、1週間後に参加者ID（${state.participantId}）を添えてGoogleフォームの追跡アンケートURLを送付します。` : `A Google Form follow-up survey URL will be sent to the entered email one week later with your participant ID (${state.participantId}).`)
     : (state.lang === "ja" ? "メールアドレスは未入力のため，1週間後アンケートの送付対象にはなりません。" : "No email address was entered, so no follow-up survey will be sent.");
   app.innerHTML = layout(`
-    <section class="card stack center">
+    <section class="card stack center final-card">
       <div class="theme">${state.lang === "ja" ? "終了" : "Finished"}</div>
       <h2 class="title">${state.lang === "ja" ? "ご協力ありがとうございました" : "Thank you for your cooperation"}</h2>
       <p>${escapeHtml(follow)}</p>
-      ${emailPreview ? `<p class="notice">${escapeHtml(emailPreview.forms.map(f => `${f.lang.toUpperCase()}: ${f.url}`).join(" / "))}</p>` : ""}
+      ${emailPreview ? `<p class="notice followup-links">${escapeHtml(emailPreview.forms.map(f => `${f.lang.toUpperCase()}: ${f.url}`).join(" / "))}</p>` : ""}
       <p class="notice">${state.lang === "ja" ? "ログ送信先が設定されていない場合でも、下のボタンからCSVログをダウンロードできます。" : "Even if no log endpoint is configured, you can download the CSV log using the button below."}</p>
       <div class="row"><button class="btn" onclick="downloadCsv()">${escapeHtml(t('download'))}</button><button class="btn secondary" onclick="location.reload()">${escapeHtml(t('restart'))}</button></div>
     </section>
@@ -480,11 +564,11 @@ async function sendCompletionLog(){
   };
   try{
     await fetch(LOG_ENDPOINT, {
-  method: "POST",
-  mode: "no-cors",
-  headers: {"Content-Type":"text/plain;charset=utf-8"},
-  body: JSON.stringify(payload)
-});
+      method: "POST",
+      mode: "no-cors",
+      headers: {"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(payload)
+    });
   }catch(_e){}
 }
 
